@@ -133,22 +133,29 @@ void onePipe() {
 				if(pid2 == -1) { //check error
 					perror("pipe1fork error");
 				} else if(pid2 == 0) { /* child read from pipe*/
+					printf("			second child\n");
 					dup2(fd[0], 0);  
 					close(fd[1]);   /* close unused write end */
-					execvp(argC[0], argC);
-					_exit(2);
-				} else { /* parent write to pipe*/
-					//set pid2 process group id  to pid
-					setpgid(getpid(), pid2);
-					printf("pid2 = %d \n", getpgid(pid2));
-					dup2(fd[1], 1);
-					//close(fd[1]);
 					if(*argl[n] == '>'){
 						redict(argl[n+1], STDOUT_FILENO,O_CREAT | O_WRONLY);
 						//redict(argl[n+1], STDIN_FILENO,O_RDWR);
-						execvp(argP[0], argP);
+						execvp(argC[0], argC);
 					}
+					//execvp(argC[0], argC);
 					//_exit(2);
+				} else { /* parent write to pipe*/
+					//set pid2 process group id  to pid
+					printf("			second parent\n");
+					setpgid(getpid(), pid2);
+					//printf("pid2 = %d \n", getpgid(pid2));
+					dup2(fd[1], 1);
+					close(fd[0]);
+					//if(*argl[n] == '>'){
+						//redict(argl[n+1], STDOUT_FILENO,O_CREAT | O_WRONLY);
+						//redict(argl[n+1], STDIN_FILENO,O_RDWR);
+						execvp(argP[0], argP);
+					//}
+					_exit(2);
 				}	
 			}
 		}
@@ -164,7 +171,7 @@ void onePipe() {
 			check = 3;
 		} 
 	}//end of for-loop
-	execvp(argP[0], argP);
+	execvp(argC[0], argC);
 	_exit(2);
 }//end of method
 
@@ -208,6 +215,7 @@ int main( int argc, char *argv[] )
 			perror("first fork error");
 		}
 		if(!pid) { /* parent*/
+			printf("		first parent\n");
 			setpgid(pid, pid);
 			//---------------block 1----------no pipes----------------
 			if( pipecount == 0 ) {
@@ -219,6 +227,7 @@ int main( int argc, char *argv[] )
 				
 			}
 		} else { /* child */
+			printf("		first child\n");
 			wait(&l);
 		}
 		printf( "SeaShell: \n" );		
