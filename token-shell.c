@@ -124,7 +124,7 @@ void onePipe() {
 			redict(argl[n], STDIN_FILENO,O_RDWR);
 			check = 0;
 		} else if( check == 3 ) {
-			printf("hello \n");
+			//printf("hello \n");
 			if(pipe(fd) == -1) {
 				perror("pipe error");
 			} else {
@@ -133,28 +133,23 @@ void onePipe() {
 				if(pid2 == -1) { //check error
 					perror("pipe1fork error");
 				} else if(pid2 == 0) { /* child read from pipe*/
-					printf("			second child\n");
+					//printf("			second child\n");
 					dup2(fd[0], 0);  
 					close(fd[1]);   /* close unused write end */
 					if(*argl[n] == '>'){
 						redict(argl[n+1], STDOUT_FILENO,O_CREAT | O_WRONLY);
-						//redict(argl[n+1], STDIN_FILENO,O_RDWR);
 						execvp(argC[0], argC);
 					}
-					//execvp(argC[0], argC);
-					//_exit(2);
 				} else { /* parent write to pipe*/
 					//set pid2 process group id  to pid
-					printf("			second parent\n");
+					//int ll;
+					//wait(&ll);
+					//printf("			second parent\n");
 					setpgid(getpid(), pid2);
 					//printf("pid2 = %d \n", getpgid(pid2));
 					dup2(fd[1], 1);
 					close(fd[0]);
-					//if(*argl[n] == '>'){
-						//redict(argl[n+1], STDOUT_FILENO,O_CREAT | O_WRONLY);
-						//redict(argl[n+1], STDIN_FILENO,O_RDWR);
-						execvp(argP[0], argP);
-					//}
+					execvp(argP[0], argP);
 					_exit(2);
 				}	
 			}
@@ -210,12 +205,14 @@ int main( int argc, char *argv[] )
 		}
 		free_tokenizer( tokenizer );
 		pid = fork();
-		printf("pid = %d \n", pid);
+		//printf("pid = %d \n", pid);
 		if(pid ==-1) {
 			perror("first fork error");
 		}
 		if(!pid) { /* parent*/
-			printf("		first parent\n");
+			//int l;
+			//wait(&l);
+			//printf("		first parent\n");
 			setpgid(pid, pid);
 			//---------------block 1----------no pipes----------------
 			if( pipecount == 0 ) {
@@ -227,10 +224,11 @@ int main( int argc, char *argv[] )
 				
 			}
 		} else { /* child */
-			printf("		first child\n");
+			//printf("		first child\n");
 			wait(&l);
+			//wait(&l);
 		}
-		printf( "SeaShell: \n" );		
+		printf( "SeaShell: \n" );	
 	 }
 	 printf( "\nBye!\n" );
 		return 0; /* all's well that end's well */
