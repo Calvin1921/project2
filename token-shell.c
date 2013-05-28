@@ -14,72 +14,74 @@
 * Main program execution
 */
 #define maxArgLength 256
-char *argl[maxArgLength];
+char *argl[maxArgLength]; //store all the string
 pid_t pid = 0;
+char *argP[maxArgLength]; //store string before '|'
+char *argC[maxArgLength]; // store string after '|'
 int pipecount = 0;
 int leftcount = 0;
 int rightcount = 0;
 int tokencount = 0;
-
-void noPipe() {
-	
-	if( leftcount == 0 && rightcount == 0 ) {	
-		argl[tokencount] = NULL;
-		execvp(argl[0], argl);
-		perror("execvp error");
-		_exit(2);
-	} else {
-		int n = 0;
-		int check = 0;
-		for( n=0; n<tokencount; n++ ) {
-			int in, out;
-			//out
-			if(check == 1) {
-				out = open( argl[n], O_CREAT | O_WRONLY, 0644);
-				if(out == -1) {
-					perror("check1 open");
-				}
-				dup2(out, STDOUT_FILENO);
-				check = 0;
-			} else if( check == 2) {
-				in = open( argl[n], O_RDWR, 0644 );
-				if(in == -1) {
-					perror("check2 open");
-				}
-				dup2(in, STDIN_FILENO);
-				check = 0;
-			}
-			if(*argl[n] == '>') {
-				printf( "HEll Yea: \n" );
-				argl[n] = NULL;
-				check = 1;
-			} else if(*argl[n] == '<') {
-			//printf( "another HEll Yea: \n" );
-				argl[n] = NULL;
-				check = 2;
-			} 
+/*
+ * 
+ */
+void redict(const char *path, int stdin, int flag){
+		int inOrOut;
+		//open
+		inOrOut = open( path, flag, 0644 );
+		if(inOrOut == -1) {
+			perror("check2 open");
 		}
-		argl[tokencount] = NULL;
-		printf( "%c",*argl[0] );
-		execvp(argl[0], argl);
-		perror("execvp error");
-		_exit(2);
-	}
-//end of method	works great
+		dup2(inOrOut, stdin);
 }
 
-
-//-------this works for a single pipe or a pipe with a redirect for input 
-//-------like < symbol before the | and no redirects after |
-void onePipe() {
-	pid_t pid2 = 0;
-	int fd[2];
+/*
+ * deal with redirect without pipe
+ */
+void noPipe() {
 	int n = 0;
 	int check = 0;
-	char *argP[tokencount];
-	char *argC[tokencount];
+	//loop over the argl array
+	for( n=0; n<tokencount; n++ ) {
+		if(check == 1) {
+			//deal with '>'
+			redict(argl[n], STDOUT_FILENO,O_CREAT | O_WRONLY);
+			check = 0;
+		} else if( check == 2) {
+			//deal with '<'
+			redict(argl[n], STDIN_FILENO,O_RDWR);
+			check = 0;
+		}
+		//check if equal to '>' or '<'
+		if(*argl[n] == '>') {
+			printf( "HEll Yea: \n" );
+			argl[n] = NULL;
+			check = 1;
+		} else if(*argl[n] == '<') {
+		//printf( "another HEll Yea: \n" );
+			argl[n] = NULL;
+			check = 2;
+		} 
+	}
+	argl[tokencount] = NULL;
+	printf( "%c",*argl[0] );
+	execvp(argl[0], argl);
+	perror("execvp error");
+	_exit(2);
+} //end of method	works great
+
+/*
+ * helper method to separte string to two part and put them into argC 
+ * and argP array.
+ * 
+ */
+void fillArg(){
+	int n = 0;
+	int check = 0;
 	int tempSize = 0;
+	//loop over the argl array
 	for(n=0; n<tokencount; n++ ) {
+		// check become 1 after '|'
 		if(check == 1) {
 			if(*argl[n] =='<' || *argl[n] == '>') {
 				argC[tempSize] = NULL;
@@ -87,7 +89,7 @@ void onePipe() {
 				argC[tempSize] = argl[n];
 			}
 			tempSize++;
-		} else {
+		} else { //enter before '|' and store string in to argP
 			argP[n] = argl[n];
 			if(*argl[n] == '|') {
 				argP[n] = '\0';
@@ -99,91 +101,72 @@ void onePipe() {
 		}
 	}
 	argC[tempSize] = '\0';
-	/*
-	for(n=0; n<tokencount; n++) {
-		printf("argP: %s\n", argP[n]);
-		
-	}
-	for(n=0; n<tokencount; n++) {
-		printf("argC: %s\n", argC[n]);
-	}*/
+}//end of helper method
+
+//-------this works for a single pipe or a pipe with a redirect for input 
+//-------like < symbol before the | and no redirects after |
+void onePipe() {
+	pid_t pid2 = 0;
+	int fd[2];
+	int n = 0;
+	int check = 0;
+
+	fillArg();
 	
 	check = 0;
 	for( n=0; n<tokencount; n++ ) {
-		int in, out;
-		//out
 		if(check == 1) {
-			out = open( argl[n], O_CREAT | O_WRONLY, 0644);
-			if(out == -1) {
-				perror("check1 open");
-			}
-			dup2(out, STDOUT_FILENO);
+			// for redirect before pipe (create or write)
+			redict(argl[n], STDOUT_FILENO,O_CREAT | O_WRONLY);
 			check = 0;
 		} else if( check == 2) {
-			in = open( argl[n], O_RDWR, 0644 );
-			if(in == -1) {
-				perror("check2 open");
-			}
-			dup2(in, STDIN_FILENO);
+			// for redirect before pipe (read or write)
+			redict(argl[n], STDIN_FILENO,O_RDWR);
 			check = 0;
 		} else if( check == 3 ) {
-			/*attempt to catch redirect symbols after pipe in input chars
-			int nc = 0;
-			int checkTwo = 0;
-			for(nc=0; nc<tokencount; nc++) {
-				int out = 0;
-				if(checkTwo == 1) {
-					out = open( argC[n], O_CREAT | O_WRONLY, 0644);
-					if(out == -1) {
-						perror("check1 open");
-					}
-					dup2(out, STDOUT_FILENO);
-				}
-				if(*argC[nc] == '>') {
-					checkTwo = 1;
-				}
-			}*/
 			printf("hello \n");
 			if(pipe(fd) == -1) {
 				perror("pipe error");
 			} else {
-				pid2 = fork();
-				if(pid2 == -1) {
+				pid2 = fork(); // fork
+				
+				if(pid2 == -1) { //check error
 					perror("pipe1fork error");
-				} else if(pid2 == 0) {
-					dup2(fd[0], 0);
-					close(fd[1]);  
+				} else if(pid2 == 0) { /* child read from pipe*/
+					dup2(fd[0], 0);  
+					close(fd[1]);   /* close unused write end */
 					execvp(argC[0], argC);
 					_exit(2);
-				} else {
+				} else { /* parent write to pipe*/
+					//set pid2 process group id  to pid
+					setpgid(getpid(), pid2);
+					printf("pid2 = %d \n", getpgid(pid2));
 					dup2(fd[1], 1);
-					close(fd[1]);
-					//printf("made it here\n");
-					execvp(argP[0], argP);
-					_exit(2);
+					//close(fd[1]);
+					if(*argl[n] == '>'){
+						redict(argl[n+1], STDOUT_FILENO,O_CREAT | O_WRONLY);
+						//redict(argl[n+1], STDIN_FILENO,O_RDWR);
+						execvp(argP[0], argP);
+					}
+					//_exit(2);
 				}	
 			}
 		}
+		//check '>', '<' and '|'
 		if(*argl[n] == '>') {
-			printf( "HEll Yea: \n" );
 			argl[n] = NULL;
 			check = 1;
 		} else if(*argl[n] == '<') {
-		//printf( "another HEll Yea: \n" );
 			argl[n] = NULL;
 			check = 2;
 		} else if(*argl[n] == '|') {
 			argl[n] = NULL;
 			check = 3;
 		} 
-	}
-	/*
-	argl[tokencount] = NULL;
-	printf( "%c",*argl[0] );
-	execvp(argl[0], argl);
-	perror("execvp error");
-	_exit(2);*/	
-}
+	}//end of for-loop
+	execvp(argP[0], argP);
+	_exit(2);
+}//end of method
 
 int main( int argc, char *argv[] )
 {
@@ -192,6 +175,7 @@ int main( int argc, char *argv[] )
 	char string[256] = "";
 	char *tok;
 	int br;
+	
 	string[255] = '\0';  
 	printf( "\n\nSeaShell: \n" );
 	while ((br = read( STDIN_FILENO, string, 255 )) > 0) { 
@@ -201,31 +185,30 @@ int main( int argc, char *argv[] )
 		tokenizer = init_tokenizer( string );
 		tokencount = 0;
 		pipecount = 0;
-		leftcount = 0;
-		rightcount = 0;
+		//leftcount = 0;
+		//rightcount = 0;
 		int i = 0;
 		while( (tok = get_next_token( tokenizer )) != NULL ) {
-			//char *tempora = tok;
 			tokencount += 1;
-			if( tok[0] == '<' ) {
-				leftcount += 1;
-			} else if( tok[0] == '>' ) {
-				rightcount += 1;
-			} else if( tok[0] == '|' ) {
+			//if( tok[0] == '<' ) {
+				//leftcount += 1;
+			//} else if( tok[0] == '>' ) {
+				//rightcount += 1;
+			//} else 
+			if( tok[0] == '|' ) {
 				pipecount += 1;
 			} 
 			argl[i] = tok;
-			i = i + 1;	
-			//free( tok );
-			//free( tempora );
+			i = i + 1;
 		}
-		
 		free_tokenizer( tokenizer );
 		pid = fork();
+		printf("pid = %d \n", pid);
 		if(pid ==-1) {
 			perror("first fork error");
 		}
-		if(!pid) {
+		if(!pid) { /* parent*/
+			setpgid(pid, pid);
 			//---------------block 1----------no pipes----------------
 			if( pipecount == 0 ) {
 				noPipe();
@@ -235,17 +218,11 @@ int main( int argc, char *argv[] )
 				onePipe();
 				
 			}
-			//---------------block 3----------two pipes----or many----- 
-			else {
-				//multiple pipes
-				
-			}
-		} else {
+		} else { /* child */
 			wait(&l);
 		}
 		printf( "SeaShell: \n" );		
 	 }
-
 	 printf( "\nBye!\n" );
-	 return 0; /* all's well that end's well */
+		return 0; /* all's well that end's well */
 }
