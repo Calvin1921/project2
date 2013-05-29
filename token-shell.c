@@ -44,9 +44,9 @@ void noPipe() {
 	} else if(pid == 0) {
 			int n = 0;
 			int check = 0;
+			setpgid(pid, pid);
 			for( n=0; n<tokencount; n++ ) {
 				int in, out;
-				//out
 				if(check == 1) {
 					out = open( argl[n], O_CREAT | O_WRONLY, 0644);
 					if(out == -1) {
@@ -69,7 +69,6 @@ void noPipe() {
 					argl[n] = NULL;
 					check = 1;
 				} else if(*argl[n] == '<') {
-				//printf( "another HEll Yea: \n" );
 					argl[n] = NULL;
 					check = 2;
 				} 
@@ -158,7 +157,6 @@ int main( int argc, char *argv[] )
 		rightcount = 0;
 		int i = 0;
 		while( (tok = get_next_token( tokenizer )) != NULL ) {
-			//char *tempora = tok;
 			tokencount += 1;
 			if( tok[0] == '<' ) {
 				leftcount += 1;
@@ -166,13 +164,9 @@ int main( int argc, char *argv[] )
 				rightcount += 1;
 			} else if( tok[0] == '|' ) {
 				pipecount += 1;
-			} //else if( tok[0] == '&' ) {
-				//ampcount += 1;
-			//}
+			}
 			argl[i] = tok;
 			i = i + 1;	
-			//free( tok );
-			//free( tempora );
 		}
 		
 		free_tokenizer( tokenizer );
@@ -193,20 +187,21 @@ int main( int argc, char *argv[] )
 			onePipe();
 			if(pipe(fd) == -1) {
 				perror("pipe error");
-				//continue;
+				continue;
 			}
 			pid = fork();
+			
 			if(pid == -1) {
 				perror("pipe1 error in fork1");
-				//continue;
+				continue;
 			} else if(pid == 0 ) {
-				
+				setpgid(pid, pid);
 				if( leftcount == 1	) {
 					int in;
 					in = open( argl[inputIndex], O_RDWR, 0644 );
 					if(in == -1) {
 						perror("input error before pipe");
-						//continue;
+						continue;
 					} 
 					dup2(in, STDIN_FILENO);
 					close(in);
@@ -217,18 +212,19 @@ int main( int argc, char *argv[] )
 				execvp(argP[0], argP);
 				_exit(2);
 			} else {
+				setpgid(pid, pid);
 				pid2 = fork();
 				if(pid2 == -1) {
 					perror("onepipe fork2 error");
-					//continue;
+					continue;
 				} else if(pid2 == 0) {
-					
+					setpgid(pid2, pid);
 					if( rightcount == 1) {
 						int out;
 						out = open( argl[outputIndex], O_CREAT | O_WRONLY, 0644);
 						if(out == -1) {
 							perror("output error after pipe");
-							//continue;
+							continue;
 						}
 						dup2(out, STDOUT_FILENO);
 						close(out);
@@ -236,16 +232,15 @@ int main( int argc, char *argv[] )
 					dup2(fd[0], 0);
 					close(fd[1]);
 					close(fd[0]);
-					
 					execvp(argC[0], argC);
 					_exit(2);
 				} else {
+					setpgid(pid2, pid);
 					close(fd[1]);
 					close(fd[0]);
 					wait(&l);
 					wait(&l);
 					printf( "SeaShell: \n" );
-					//wait(&l);
 					
 				}
 			}
@@ -260,7 +255,6 @@ int main( int argc, char *argv[] )
 		}
 				
 	 }
-	//printf( "\n\nSeaShell: \n" );
 	printf( "\nBye!\n" );
 	return 0; /* all's well that end's well */
 }
