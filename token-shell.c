@@ -166,9 +166,9 @@ int main( int argc, char *argv[] )
 				rightcount += 1;
 			} else if( tok[0] == '|' ) {
 				pipecount += 1;
-			} else if( tok[0] == '&' ) {
-				ampcount += 1;
-			}
+			} //else if( tok[0] == '&' ) {
+				//ampcount += 1;
+			//}
 			argl[i] = tok;
 			i = i + 1;	
 			//free( tok );
@@ -176,11 +176,13 @@ int main( int argc, char *argv[] )
 		}
 		
 		free_tokenizer( tokenizer );
-		if(leftcount > 1 || rightcount > 1 || pipecount > 1 || ampcount) {
+		if(leftcount > 1 || rightcount > 1 || pipecount > 1 || ampcount > 1) {
 			printf("wrong commands dammit!\n");
 			return 0;
 		}
-		
+		if(*argl[tokencount-1] == '&' ) {
+			ampcount++;
+		}
 		
 		//---------------block 1----------no pipes----------------
 		if( pipecount == 0 ) {
@@ -253,6 +255,7 @@ int main( int argc, char *argv[] )
 		//--------------clear arrays-------------------- 
 		int nnn = 0;
 		for(nnn = 0; nnn<tokencount; nnn++) {
+			argC[nnn] = NULL;
 			argP[nnn] = NULL;
 		}
 				
