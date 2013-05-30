@@ -30,12 +30,26 @@ int outputIndex = 0;
 int pipeIndex = 0;
 int l, ll;
 int ampcount = 0;
+pid_t chpid;
+pid_t testpid;
+pid_t testpid2;
+pid_t testpid3;
 
 /*
 struct sigaction act;
 act.sa_handler = SIG_IGN;
 sigaction(SIGINT, &act, NULL);
-*/
+
+
+void handler(int signum) {
+	if(signum == SIGCHLD) {
+		
+	}
+	if(signum == SIGINT ) {
+		//signal(
+	}
+	
+}*/
 void noPipe() {
 	pid = fork();
 	if(pid == -1 ) {
@@ -44,9 +58,9 @@ void noPipe() {
 	} else if(pid == 0) {
 			int n = 0;
 			int check = 0;
-			setpgid(pid, pid);
 			for( n=0; n<tokencount; n++ ) {
 				int in, out;
+				//out
 				if(check == 1) {
 					out = open( argl[n], O_CREAT | O_WRONLY, 0644);
 					if(out == -1) {
@@ -58,7 +72,7 @@ void noPipe() {
 				} else if( check == 2) {
 					in = open( argl[n], O_RDWR, 0644 );
 					if(in == -1) {
-						perror("input redirext failed");
+						perror("input redirect failed");
 						return;
 					}
 					dup2(in, STDIN_FILENO);
@@ -69,18 +83,33 @@ void noPipe() {
 					argl[n] = NULL;
 					check = 1;
 				} else if(*argl[n] == '<') {
+				//printf( "another HEll Yea: \n" );
 					argl[n] = NULL;
 					check = 2;
 				} 
 			}
 			argl[tokencount] = '\0';
-			//act.sa_handler = SIG_DFL;
-			//sigaction(SIGINT, &act, NULL);
+			setpgid(getpid(), getpid());
+			testpid = getpgid( getpid() );
+			tcsetpgrp(STDIN_FILENO, testpid);
+			//signal(SIGTTOU, SIG_IGN);
 			execvp(argl[0], argl);
 			perror("execvp error");
 			_exit(2);		
 	} else {
-		wait(&l);
+		printf("ampcount = %d\n", 0);
+		if( ampcount == 0) {
+			//wait(&l);
+			waitpid(pid, &l, 0);
+			//testpid3 = getpgid(pid);
+			//setpgid(getpid(), testpid3);
+			testpid2 = getpgid(getpid());
+			tcsetpgrp(STDIN_FILENO, testpid2);
+		} else {
+			printf("Running: a process\n");
+			testpid2 = getpgid(pid);
+			setpgid(getpid(), testpid2);
+		}
 		printf( "\n\nSeaShell: \n" );
 	}
 	
@@ -138,13 +167,21 @@ void onePipe() {
 
 int main( int argc, char *argv[] )
 {
+	struct sigaction act;
+	act.sa_handler = SIG_IGN;
+	sigaction(SIGINT, &act, NULL);
 	TOKENIZER *tokenizer;
 	char string[256] = "";
 	char *tok;
 	int br;
 	string[255] = '\0';  
-	printf( "\n\nSeaShell: \n" );
+	
+	
+	signal(SIGTTOU, SIG_IGN);
+	
+	printf( "\nSeaShell: \n" );
 	while ((br = read( STDIN_FILENO, string, 255 )) > 0) { 
+		
 		if(br <= 1) {
 			printf( "SeaShell: \n" );
 			continue;
@@ -155,6 +192,7 @@ int main( int argc, char *argv[] )
 		pipecount = 0;
 		leftcount = 0;
 		rightcount = 0;
+		ampcount = 0;
 		int i = 0;
 		while( (tok = get_next_token( tokenizer )) != NULL ) {
 			tokencount += 1;
@@ -164,9 +202,15 @@ int main( int argc, char *argv[] )
 				rightcount += 1;
 			} else if( tok[0] == '|' ) {
 				pipecount += 1;
-			}
+			} 
 			argl[i] = tok;
 			i = i + 1;	
+			//free( tok );
+			//free( tempora );
+		}
+		if( *argl[i-1] == '&' ) {
+				ampcount += 1;
+				argl[i-1] = '\0';
 		}
 		
 		free_tokenizer( tokenizer );
@@ -174,9 +218,7 @@ int main( int argc, char *argv[] )
 			printf("wrong commands dammit!\n");
 			return 0;
 		}
-		if(*argl[tokencount-1] == '&' ) {
-			ampcount++;
-		}
+		
 		
 		//---------------block 1----------no pipes----------------
 		if( pipecount == 0 ) {
@@ -190,7 +232,6 @@ int main( int argc, char *argv[] )
 				continue;
 			}
 			pid = fork();
-			
 			if(pid == -1) {
 				perror("pipe1 error in fork1");
 				continue;
@@ -206,6 +247,8 @@ int main( int argc, char *argv[] )
 					dup2(in, STDIN_FILENO);
 					close(in);
 				}
+				testpid = getpgid( getpid() );
+				tcsetpgrp(STDIN_FILENO, testpid);
 				dup2(fd[1], 1);
 				close(fd[1]);
 				close(fd[0]);		
@@ -218,7 +261,7 @@ int main( int argc, char *argv[] )
 					perror("onepipe fork2 error");
 					continue;
 				} else if(pid2 == 0) {
-					setpgid(pid2, pid);
+					
 					if( rightcount == 1) {
 						int out;
 						out = open( argl[outputIndex], O_CREAT | O_WRONLY, 0644);
@@ -232,16 +275,25 @@ int main( int argc, char *argv[] )
 					dup2(fd[0], 0);
 					close(fd[1]);
 					close(fd[0]);
+					
 					execvp(argC[0], argC);
 					_exit(2);
 				} else {
 					setpgid(pid2, pid);
-					close(fd[1]);
-					close(fd[0]);
-					wait(&l);
-					wait(&l);
-					printf( "SeaShell: \n" );
+					if( ampcount == 0 ) {
+						close(fd[1]);
+						close(fd[0]);
+						waitpid(pid, &l, 0);
+						waitpid(pid2, &l, 0);
+						testpid2 = getpgid(getpid());
+						tcsetpgrp(STDIN_FILENO, testpid2);
+						
+					} else {
+						
+	
+					}
 					
+					printf( "SeaShell: " );					
 				}
 			}
 			
@@ -255,8 +307,18 @@ int main( int argc, char *argv[] )
 		}
 				
 	 }
+	//printf( "\n\nSeaShell: \n" );
 	printf( "\nBye!\n" );
 	return 0; /* all's well that end's well */
 }
 
 
+/*
+		while((chpid = ) > 0) {
+			
+			if(WIFSIGNALED(l)) {
+				printf("terminated with signal %d\n", WTERMSIG(l));
+			} else if(WIFEXITED(l)) {
+				printf("process exited with status %d\n", WEXITSTATUS(l));
+			}
+		}*/
