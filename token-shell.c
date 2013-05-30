@@ -89,7 +89,7 @@ void noPipe() {
 				} 
 			}
 			argl[tokencount] = '\0';
-			setpgid(getpid(), getpid());
+			setpgid(pid, pid);
 			testpid = getpgid( getpid() );
 			tcsetpgrp(STDIN_FILENO, testpid);
 			//signal(SIGTTOU, SIG_IGN);
@@ -107,8 +107,7 @@ void noPipe() {
 			tcsetpgrp(STDIN_FILENO, testpid2);
 		} else {
 			printf("Running: a process\n");
-			testpid2 = getpgid(pid);
-			setpgid(getpid(), testpid2);
+			setpgid(pid, pid);
 		}
 		printf( "\n\nSeaShell: \n" );
 	}
@@ -293,7 +292,7 @@ int main( int argc, char *argv[] )
 	
 					}
 					
-					printf( "SeaShell: " );					
+					printf( "\nSeaShell: \n" );					
 				}
 			}
 			
