@@ -34,40 +34,36 @@ pid_t chpid;
 pid_t testpid;
 pid_t testpid2;
 pid_t testpid3;
-//staticvoid handler(int);
+pid_t terminalpid;
+void handler(int);
 /*
 struct sigaction act;
 act.sa_handler = SIG_IGN;
 sigaction(SIGINT, &act, NULL);
-*/
+
 
 void handler(int sig) {
-	if(sig ==SIGTERM){
-		printf("process %d received SIGINT (CTRL-C \n ", getpid());
-		printf("process %d passing SIGINT to %d \n ", getpid(), pid);
-		signal(SIGTERM, SIG_IGN);
-		//kill(pid, SIGINT);
-		//return;
-	}
-	if(sig == SIGTSTP){
-		printf("process %d received SIGINT (CTRL-C \n ", getpid());
-		printf("process %d passing SIGINT to %d \n ", getpid(), pid);
+	if(sig == SIGTSTP) {
+		killpg(pid, SIGTSTP);
 		signal(SIGTSTP, SIG_IGN);
-		//kill(pid, SIGINT);
-		//return;
 	}
-}
+	if(sig == SIGCHLD ) {
+		waitpid(pid, NULL, 0);
+	}
+	
+}*/
 void noPipe() {
 	pid = fork();
 	if(pid == -1 ) {
 		perror("no pipe fork 1 error");
 		return;
 	} else if(pid == 0) {
+			//child
 			int n = 0;
 			int check = 0;
+			//look for redirects
 			for( n=0; n<tokencount; n++ ) {
 				int in, out;
-				//out
 				if(check == 1) {
 					out = open( argl[n], O_CREAT | O_WRONLY, 0644);
 					if(out == -1) {
@@ -95,30 +91,38 @@ void noPipe() {
 					check = 2;
 				} 
 			}
+			//for execvp to work
 			argl[tokencount] = '\0';
+			//sets process to new group id different from terminals
 			setpgid(pid, pid);
-			testpid = getpgid( getpid() );
-			tcsetpgrp(STDIN_FILENO, testpid);
-			
-			int test = 0;
-			test = execvp(argl[0], argl);
-			if(test < 0) {
-				printf("\n exec error\n");
+			//this makes cat write to terminal if foreground process
+			if( ampcount == 0) {
+				testpid = getpgid( getpid() );
+				tcsetpgrp(STDIN_FILENO, testpid);
+			} else {
+				//tcsetpgrp(STDIN_FILENO, terminalpid);
 			}
+			execvp(argl[0], argl);
 			perror("execvp error");
 			_exit(2);		
 	} else {
+		//parent
+		// set parent group id
 		setpgid(getpid(), getpid());
-		printf("ampcount = %d\n", 0);
+		//wait if foreground process
 		if( ampcount == 0) {
 			waitpid(pid, &l, WUNTRACED);
+			//give parent foreground control
 			testpid2 = getpgid(getpid());
 			tcsetpgrp(STDIN_FILENO, testpid2);
 		} else {
+			//signal(SIGCHLD, handler);
+			printf("[1] %d\n", getpid());
+			tcsetpgrp(STDIN_FILENO, terminalpid);
 			printf("Running: a process\n");
 			
 		}
-		printf( "\n\nSeaShell: \n" );
+		printf( "SeaShell: \n" );
 	}
 	
 //end of method	works great
@@ -176,20 +180,19 @@ void onePipe() {
 
 int main( int argc, char *argv[] )
 {
-	/*struct sigaction act;
+	struct sigaction act;
 	act.sa_handler = SIG_IGN;
-	sigaction(SIGINT, &act, NULL);*/
+	sigaction(SIGINT, &act, NULL);
 	TOKENIZER *tokenizer;
 	char string[256] = "";
 	char *tok;
 	int br;
 	string[255] = '\0';  
 	
+	terminalpid = getpgid(getpid());
+	//printf("this is shells pid: %d\n", terminalpid);
 	signal(SIGTTOU, SIG_IGN);
-	signal(SIGTSTP, SIG_IGN);
-	if(signal(SIGINT, handler)==SIG_ERR){
-		printf("SIGINT not working");
-	}
+	//signal(SIGTSTP, handler);
 	printf( "\nSeaShell: \n" );
 	while ((br = read( STDIN_FILENO, string, 255 )) > 0) { 
 		
@@ -223,9 +226,7 @@ int main( int argc, char *argv[] )
 				ampcount += 1;
 				argl[i-1] = NULL;
 				tokencount = tokencount -1;
-				printf("\n new & found \n");
 		}
-		printf("\n new & found ampcount = %d\n", ampcount);
 		free_tokenizer( tokenizer );
 		if(leftcount > 1 || rightcount > 1 || pipecount > 1 || ampcount > 1) {
 			printf("wrong commands dammit!\n");
@@ -261,8 +262,10 @@ int main( int argc, char *argv[] )
 					close(in);
 				}
 				setpgid(pid, pid);
-				testpid = getpgid( getpid() );
-				tcsetpgrp(STDIN_FILENO, testpid);
+				if( ampcount == 1 ) {
+					testpid = getpgid( getpid() );
+					tcsetpgrp(STDIN_FILENO, testpid);
+				}
 				dup2(fd[1], 1);
 				close(fd[1]);
 				close(fd[0]);		
