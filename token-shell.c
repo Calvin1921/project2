@@ -35,23 +35,32 @@ pid_t testpid;
 pid_t testpid2;
 pid_t testpid3;
 pid_t terminalpid;
+int fg, bg;
 void handler(int);
 /*
 struct sigaction act;
 act.sa_handler = SIG_IGN;
 sigaction(SIGINT, &act, NULL);
-
+*/
 
 void handler(int sig) {
-	if(sig == SIGTSTP) {
-		killpg(pid, SIGTSTP);
-		signal(SIGTSTP, SIG_IGN);
+	//int ppid;
+	if(sig == SIGCHLD) {
+		pid = waitpid(-1, &l, WNOHANG | WSTOPPED);
+		//printf("got SIGCHILD     %d\n", pid);
+		//kill(getpid(), SIGCHLD);
+		//return;
+		if(WIFEXITED(l)){
+			printf("Exited\n");
+		}
+		//killpg(pid, SIGTSTP);
+		//signal(SIGTSTP, SIG_IGN);
 	}
-	if(sig == SIGCHLD ) {
-		waitpid(pid, NULL, 0);
-	}
+	//if(sig == SIGCHLD ) {
+		//waitpid(pid, NULL, 0);
+	//}
 	
-}*/
+}
 void noPipe() {
 	pid = fork();
 	if(pid == -1 ) {
@@ -82,7 +91,7 @@ void noPipe() {
 					check = 0;
 				}
 				if(*argl[n] == '>') {
-					printf( "HEll Yea: \n" );
+					//printf( "HEll Yea: \n" );
 					argl[n] = NULL;
 					check = 1;
 				} else if(*argl[n] == '<') {
@@ -117,12 +126,16 @@ void noPipe() {
 			tcsetpgrp(STDIN_FILENO, testpid2);
 		} else {
 			//signal(SIGCHLD, handler);
-			printf("[1] %d\n", getpid());
-			tcsetpgrp(STDIN_FILENO, terminalpid);
-			printf("Running: a process\n");
+			printf("[1] %d\n", pid);
+			//tcsetpgrp(STDIN_FILENO, terminalpid);
+			printf("Running: %d \n",pid);
+			//int a;
+			/*for(a=0;a<tokencount; a++){
+				printf("%s ", argl[a]);
+			}
+			printf( "\n" );*/
 			
 		}
-		printf( "SeaShell: \n" );
 	}
 	
 //end of method	works great
@@ -180,9 +193,9 @@ void onePipe() {
 
 int main( int argc, char *argv[] )
 {
-	struct sigaction act;
+	/*struct sigaction act;
 	act.sa_handler = SIG_IGN;
-	sigaction(SIGINT, &act, NULL);
+	sigaction(SIGINT, &act, NULL);*/
 	TOKENIZER *tokenizer;
 	char string[256] = "";
 	char *tok;
@@ -191,8 +204,10 @@ int main( int argc, char *argv[] )
 	
 	terminalpid = getpgid(getpid());
 	//printf("this is shells pid: %d\n", terminalpid);
-	signal(SIGTTOU, SIG_IGN);
-	//signal(SIGTSTP, handler);
+	signal(SIGTTOU, SIG_IGN); //*****need this to run cat********
+	signal(SIGTSTP, SIG_IGN);
+	signal(SIGTERM, SIG_IGN);
+	//signal(SIGCHLD,handler);
 	printf( "\nSeaShell: \n" );
 	while ((br = read( STDIN_FILENO, string, 255 )) > 0) { 
 		
@@ -207,6 +222,8 @@ int main( int argc, char *argv[] )
 		leftcount = 0;
 		rightcount = 0;
 		ampcount = 0;
+		fg=0;
+		bg=0;
 		int i = 0;
 		while( (tok = get_next_token( tokenizer )) != NULL ) {
 			tokencount += 1;
@@ -216,7 +233,12 @@ int main( int argc, char *argv[] )
 				rightcount += 1;
 			} else if( tok[0] == '|' ) {
 				pipecount += 1;
-			} 
+			} else if(tok[0]=='f' && tok[0] =='g'){
+				fg=1;
+				
+			} else if(tok[0]=='b'&& tok[0] =='g'){
+				bg=1;
+			}
 			argl[i] = tok;
 			i = i + 1;	
 			//free( tok );
@@ -236,7 +258,11 @@ int main( int argc, char *argv[] )
 		
 		//---------------block 1----------no pipes----------------
 		if( pipecount == 0 ) {
+			//signal(SIGCHLD,handler);
 			noPipe();
+			if(ampcount>0){
+				signal(SIGCHLD,handler);
+			}
 		}
 		//---------------block 2----------one pipe----------------
 		else if( pipecount == 1 ) {
@@ -320,7 +346,7 @@ int main( int argc, char *argv[] )
 			argC[nnn] = NULL;
 			argP[nnn] = NULL;
 		}
-				
+		printf( "SeaShell: \n" );		
 	 }
 	//printf( "\n\nSeaShell: \n" );
 	printf( "\nBye!\n" );
