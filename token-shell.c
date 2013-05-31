@@ -36,6 +36,7 @@ pid_t testpid2;
 pid_t testpid3;
 pid_t terminalpid;
 int fg, bg;
+int stop;
 void handler(int);
 /*
 struct sigaction act;
@@ -52,6 +53,10 @@ void handler(int sig) {
 		//return;
 		if(WIFEXITED(l)){
 			printf("Exited\n");
+		}
+		if(WIFSTOPPED(l)){
+			stop =1;
+			printf("WIFSTOPPED\n");
 		}
 		//killpg(pid, SIGTSTP);
 		//signal(SIGTSTP, SIG_IGN);
@@ -129,6 +134,9 @@ void noPipe() {
 			printf("[1] %d\n", pid);
 			//tcsetpgrp(STDIN_FILENO, terminalpid);
 			printf("Running: %d \n",pid);
+			//if(ampcount){
+				signal(SIGCHLD,handler);
+			//}
 			//int a;
 			/*for(a=0;a<tokencount; a++){
 				printf("%s ", argl[a]);
@@ -222,6 +230,7 @@ int main( int argc, char *argv[] )
 		leftcount = 0;
 		rightcount = 0;
 		ampcount = 0;
+		stop =0;
 		fg=0;
 		bg=0;
 		int i = 0;
@@ -259,10 +268,12 @@ int main( int argc, char *argv[] )
 		//---------------block 1----------no pipes----------------
 		if( pipecount == 0 ) {
 			//signal(SIGCHLD,handler);
+			
 			noPipe();
-			if(ampcount>0){
-				signal(SIGCHLD,handler);
-			}
+			//if(ampcount){
+				//signal(SIGCHLD,handler);
+			//}
+			
 		}
 		//---------------block 2----------one pipe----------------
 		else if( pipecount == 1 ) {
@@ -346,7 +357,7 @@ int main( int argc, char *argv[] )
 			argC[nnn] = NULL;
 			argP[nnn] = NULL;
 		}
-		printf( "SeaShell: \n" );		
+			printf( "SeaShell: \n" );		
 	 }
 	//printf( "\n\nSeaShell: \n" );
 	printf( "\nBye!\n" );
