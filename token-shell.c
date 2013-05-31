@@ -9,7 +9,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <ctype.h>
-
+#include "LinkedList.c"
 
 /**
 * Main program execution
@@ -36,8 +36,12 @@ pid_t testpid2;
 pid_t testpid3;
 pid_t terminalpid;
 int fg, bg;
-int stop;
+char *bg_argl[maxArgLength];
+int bg_pid;
+int bg_index=0;
 void handler(int);
+struct list* bglist;
+struct job* fglist;
 /*
 struct sigaction act;
 act.sa_handler = SIG_IGN;
@@ -51,15 +55,36 @@ void handler(int sig) {
 		//printf("got SIGCHILD     %d\n", pid);
 		//kill(getpid(), SIGCHLD);
 		//return;
-		if(WIFEXITED(l)){
-			printf("Exited\n");
+		if(ampcount ==1) {
+			if(WIFEXITED(l)){
+				//printf("\nExited: \n");
+				if(!ampcount){
+					printf("Finished: %d %s\n", fglist->pid, *fglist->argl);
+				}else{
+					printf("Finished: %d\n", bglist->pid);
+					//printf("%s",argl[0]);
+				}
+				//printf("%s\n", *fglist->argl);
+				bg_index--;
+			}
 		}
 		if(WIFSTOPPED(l)){
-			stop =1;
-			printf("WIFSTOPPED\n");
+			bg_index++;
+			//stop =1;
+			//printf("\nStopped: \n");
+			if(!ampcount){
+				printf("\nStopped: %s %s\n", fglist->argl[0],fglist->argl[1]);
+			}else{
+				printf("\nStopped: %d\n", bglist->pid);
+				//printf("%s",argl[0]);
+			}
+			//printf("\nStopped: %d\n", fglist->pid);
+			//int n;
+			/*for(n=0; n< tokencount;n++){
+				printf("%s",argl[n]);
+			}*/
+			//printf("\n");
 		}
-		//killpg(pid, SIGTSTP);
-		//signal(SIGTSTP, SIG_IGN);
 	}
 	//if(sig == SIGCHLD ) {
 		//waitpid(pid, NULL, 0);
@@ -73,6 +98,8 @@ void noPipe() {
 		return;
 	} else if(pid == 0) {
 			//child
+			signal(SIGTSTP,SIG_DFL);
+			signal(SIGINT,SIG_DFL);
 			int n = 0;
 			int check = 0;
 			//look for redirects
@@ -122,20 +149,24 @@ void noPipe() {
 	} else {
 		//parent
 		// set parent group id
+		signal(SIGCHLD, handler);
 		setpgid(getpid(), getpid());
 		//wait if foreground process
 		if( ampcount == 0) {
+			fglist = fginit(getpgid(pid), argl);
+			//printf("\nRunning fg: %d \n",pid);
 			waitpid(pid, &l, WUNTRACED);
 			//give parent foreground control
 			testpid2 = getpgid(getpid());
 			tcsetpgrp(STDIN_FILENO, testpid2);
 		} else {
-			//signal(SIGCHLD, handler);
-			printf("[1] %d\n", pid);
+			//int n;
+			bglist = init(getpgid(pid), argl);
+			
+			//printf("[1] %d\n", pid);
 			//tcsetpgrp(STDIN_FILENO, terminalpid);
-			printf("Running: %d \n",pid);
+			printf("\nRunning bg: %d \n",pid);
 			//if(ampcount){
-				signal(SIGCHLD,handler);
 			//}
 			//int a;
 			/*for(a=0;a<tokencount; a++){
@@ -145,7 +176,7 @@ void noPipe() {
 			
 		}
 	}
-	
+	//printf( "left pipe\n" );
 //end of method	works great
 }
 
@@ -156,7 +187,6 @@ void onePipe() {
 	int n = 0;
 	int check = 0;
 	int tempSize = 0;
-	printf("tokencount %d\n", tokencount);
 	
 	for(n=0; n<tokencount; n++ ) {
 		if(check == 1) {
@@ -187,6 +217,7 @@ void onePipe() {
 		}
 	}
 	argC[tempSize] = '\0';
+	/*
 	printf("this is input index: %d\n", inputIndex);
 	printf("this is output index: %d\n", outputIndex);
 	printf("this is pipe index: %d\n", pipeIndex);
@@ -196,7 +227,7 @@ void onePipe() {
 	}
 	for(n=0; n<tokencount; n++) {
 		printf("argC: %s\n", argC[n]);
-	}	
+	}*/	
 }
 
 int main( int argc, char *argv[] )
@@ -214,13 +245,13 @@ int main( int argc, char *argv[] )
 	//printf("this is shells pid: %d\n", terminalpid);
 	signal(SIGTTOU, SIG_IGN); //*****need this to run cat********
 	signal(SIGTSTP, SIG_IGN);
-	signal(SIGTERM, SIG_IGN);
+	signal(SIGINT, SIG_IGN);
 	//signal(SIGCHLD,handler);
-	printf( "\nSeaShell: \n" );
+	write(1,"kinda-sh> ", 10 );
 	while ((br = read( STDIN_FILENO, string, 255 )) > 0) { 
 		
 		if(br <= 1) {
-			printf( "SeaShell: \n" );
+			write(1,"kinda-sh> ", 10 );
 			continue;
 		}
 		string[br-1] = '\0';  
@@ -230,7 +261,8 @@ int main( int argc, char *argv[] )
 		leftcount = 0;
 		rightcount = 0;
 		ampcount = 0;
-		stop =0;
+		//bg_index=0;
+		//stop =0;
 		fg=0;
 		bg=0;
 		int i = 0;
@@ -242,22 +274,50 @@ int main( int argc, char *argv[] )
 				rightcount += 1;
 			} else if( tok[0] == '|' ) {
 				pipecount += 1;
-			} else if(tok[0]=='f' && tok[0] =='g'){
-				fg=1;
+			} else if(tok[0]=='f' && tok[1] =='g'){
 				
-			} else if(tok[0]=='b'&& tok[0] =='g'){
-				bg=1;
-			}
+			} else if(tok[0]=='b'&& tok[1] =='g'){/*
+				printf("\n%dyes it works\n", bg_index);
+				//if(bg_index == 0) {
+					if(bglist==NULL) {
+						//printf("\n%dyes it works", bg_index);
+						printf("GotNULL In bg\n");
+					}else{
+						kill(-bglist->pid,SIGCONT);
+					}
+				*/
+				bg++;
+				//printf("\nbg == %d\n", bg);
+				break;
+			} 
 			argl[i] = tok;
-			i = i + 1;	
+			i = i + 1;
 			//free( tok );
 			//free( tempora );
+		}
+		if (bg){
+			printf("\nbg index is: %d\n", bg_index);
+			if(bg_index > 0) {
+				if(bglist==NULL) {
+					//printf("\n%dyes it works", bg_index);
+					printf("\nGotNULL In bg\n");
+				}else{
+					printf("\nbgpid = %d\n", bglist->pid);
+					kill(-bglist->pid,SIGCONT);
+					
+				}
+				
+			}
+			continue;
+			
 		}
 		if( *argl[i-1] == '&' ) {
 				ampcount += 1;
 				argl[i-1] = NULL;
 				tokencount = tokencount -1;
+				bg_index++;
 		}
+		
 		free_tokenizer( tokenizer );
 		if(leftcount > 1 || rightcount > 1 || pipecount > 1 || ampcount > 1) {
 			printf("wrong commands dammit!\n");
@@ -345,7 +405,6 @@ int main( int argc, char *argv[] )
 	
 					}
 					
-					printf( "\nSeaShell: \n" );					
 				}
 			}
 			
@@ -357,10 +416,11 @@ int main( int argc, char *argv[] )
 			argC[nnn] = NULL;
 			argP[nnn] = NULL;
 		}
-			printf( "SeaShell: \n" );		
+			write(1,"kinda-sh> ", 10 );		
 	 }
-	//printf( "\n\nSeaShell: \n" );
-	printf( "\nBye!\n" );
+	 if(bg){
+		write(1,"kinda-sh> ", 10 );
+	}
 	return 0; /* all's well that end's well */
 }
 
